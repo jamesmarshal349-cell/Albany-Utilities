@@ -5,6 +5,7 @@ import { getGuildConfig, setGuildConfig } from '../../services/config/guildConfi
 import { InteractionHelper } from '../../utils/interactionHelper.js';
 import { logger } from '../../utils/logger.js';
 import { handleInteractionError, replyUserError, ErrorTypes } from '../../utils/errorHandler.js';
+import { buildAssistanceSelectRow } from '../../utils/ticket/assistancePanel.js';
 
 import ticketConfig from './modules/ticket_dashboard.js';
 
@@ -153,7 +154,7 @@ description: panelMessage,
             try {
                 const sentPanel = await panelChannel.send({
                     embeds: [setupEmbed],
-                    components: [ticketButton],
+                    components: [ticketButton, buildAssistanceSelectRow()],
                 });
 
                 if (client.db && interaction.guildId) {

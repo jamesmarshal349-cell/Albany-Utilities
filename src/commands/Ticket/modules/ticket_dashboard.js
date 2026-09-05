@@ -23,6 +23,7 @@ import { TitanBotError, ErrorTypes, replyUserError } from '../../../utils/errorH
 import { getGuildConfig, setGuildConfig } from '../../../services/config/guildConfig.js';
 import { getGuildTicketStats } from '../../../utils/database/tickets.js';
 import { getUserTicketCount } from '../../../services/ticket.js';
+import { ASSISTANCE_TOPICS, buildAssistanceSelectRow, getAssistanceMessage } from '../../../utils/ticket/assistancePanel.js';
 import {
     getTicketPanelStatus,
     messageHasButtonCustomId,
@@ -108,7 +109,7 @@ async function repostTicketPanel(client, guild, guildConfig, guildId) {
 
     const sentPanel = await channel.send({
         embeds: [buildPanelEmbed(guildConfig)],
-        components: [buildPanelButtonRow(guildConfig)],
+        components: [buildPanelButtonRow(guildConfig), buildAssistanceSelectRow()],
     });
 
     await persistPanelMessageId(client, guildId, guildConfig, sentPanel.id);
@@ -165,6 +166,11 @@ function buildDashboardEmbed(config, guild, panelStatus = null, ticketStats = nu
             { name: 'DM on Close', value: config.dmOnClose !== false ? 'Enabled' : 'Disabled', inline: true },
             { name: 'Ticket Logs Channel', value: ticketLogsChannel, inline: true },
             { name: 'Transcript Channel', value: transcriptChannel, inline: true },
+            {
+                name: 'Assistance Dropdown',
+                value: ASSISTANCE_TOPICS.map((topic) => `**${topic.label}:** ${config[topic.configKey] ? 'Customized' : 'Default'}`).join('\n'),
+                inline: false,
+            },
             { name: '\u200B', value: '\u200B', inline: true },
             { name: 'Open Tickets', value: openTickets, inline: true },
             { name: 'Avg Close Time', value: avgCloseTime, inline: true },
@@ -214,6 +220,13 @@ function buildSelectMenu(guildId) {
                 .setDescription('Channel to receive auto-generated transcripts on deletion')
                 .setValue('transcript_channel')
                 .setEmoji('📜'),
+            ...ASSISTANCE_TOPICS.map((topic) =>
+                new StringSelectMenuOptionBuilder()
+                    .setLabel(`Edit ${topic.label} Message`)
+                    .setDescription(`Change the reply shown for the "${topic.label}" assistance option`)
+                    .setValue(`assist_msg_${topic.value}`)
+                    .setEmoji(topic.emoji),
+            ),
         );
 }
 
@@ -246,7 +259,7 @@ async function updateLivePanel(client, guild, config, guildId) {
 
         await panelStatus.message.edit({
             embeds: [buildPanelEmbed(config)],
-            components: [buildPanelButtonRow(config)],
+            components: [buildPanelButtonRow(config), buildAssistanceSelectRow()],
         });
         return true;
     } catch (error) {
@@ -292,6 +305,16 @@ export default {
                     customId === `ticket_cfg_delete_${guildId}`,
                 onSelect: async (selectInteraction) => {
                     const selectedOption = selectInteraction.values[0];
+
+                    if (selectedOption.startsWith('assist_msg_')) {
+                        const topicValue = selectedOption.slice('assist_msg_'.length);
+                        const topic = ASSISTANCE_TOPICS.find((t) => t.value === topicValue);
+                        if (topic) {
+                            await handleAssistanceMessage(selectInteraction, interaction, guildConfig, guildId, client, topic);
+                        }
+                        return;
+                    }
+
                     switch (selectedOption) {
                         case 'panel_message':
                             await handlePanelMessage(selectInteraction, interaction, guildConfig, guildId, client);
@@ -446,6 +469,49 @@ async function handleButtonLabel(selectInteraction, rootInteraction, guildConfig
                 }`,
             ),
         ],
+        flags: MessageFlags.Ephemeral,
+    });
+
+    await refreshDashboard(rootInteraction, guildConfig, guildId, client);
+}
+
+async function handleAssistanceMessage(selectInteraction, rootInteraction, guildConfig, guildId, client, topic) {
+    const modalCustomId = `ticket_cfg_assist_msg_${topic.value}`;
+
+    const modal = new ModalBuilder()
+        .setCustomId(modalCustomId)
+        .setTitle(`${topic.emoji} Edit ${topic.label} Message`.slice(0, 45))
+        .addComponents(
+            new ActionRowBuilder().addComponents(
+                new TextInputBuilder()
+                    .setCustomId('assist_msg_input')
+                    .setLabel('Message')
+                    .setStyle(TextInputStyle.Paragraph)
+                    .setValue(getAssistanceMessage(guildConfig, topic))
+                    .setMaxLength(2000)
+                    .setMinLength(1)
+                    .setRequired(true)
+                    .setPlaceholder(topic.defaultMessage),
+            ),
+        );
+
+    await selectInteraction.showModal(modal);
+
+    const submitted = await selectInteraction
+        .awaitModalSubmit({
+            filter: (i) => i.customId === modalCustomId && i.user.id === selectInteraction.user.id,
+            time: 120_000,
+        })
+        .catch(() => null);
+
+    if (!submitted) return;
+
+    const newMessage = submitted.fields.getTextInputValue('assist_msg_input').trim();
+    guildConfig[topic.configKey] = newMessage;
+    await setGuildConfig(client, guildId, guildConfig);
+
+    await submitted.reply({
+        embeds: [successEmbed(`✅ ${topic.label} Message Updated`, 'This is what users will see when they select this option from the assistance dropdown.')],
         flags: MessageFlags.Ephemeral,
     });
 
