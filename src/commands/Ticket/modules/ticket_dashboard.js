@@ -24,6 +24,7 @@ import { getGuildConfig, setGuildConfig } from '../../../services/config/guildCo
 import { getGuildTicketStats } from '../../../utils/database/tickets.js';
 import { getUserTicketCount } from '../../../services/ticket.js';
 import { buildAssistanceSelectRow } from '../../../utils/ticket/assistancePanel.js';
+import { TICKET_PANEL_COLOR, TICKET_PANEL_BANNER_URL } from '../../../utils/ticket/ticketPanelStyle.js';
 import {
     getTicketPanelStatus,
     messageHasButtonCustomId,
@@ -84,7 +85,8 @@ function buildPanelEmbed(config) {
     return new EmbedBuilder()
         .setTitle('Support Tickets')
         .setDescription(config.ticketPanelMessage || 'Click the button below to create a support ticket.')
-        .setColor(getColor('info'));
+        .setColor(TICKET_PANEL_COLOR)
+        .setImage(TICKET_PANEL_BANNER_URL);
 }
 
 function buildPanelButtonRow(config) {

@@ -6,6 +6,7 @@ import { InteractionHelper } from '../../utils/interactionHelper.js';
 import { logger } from '../../utils/logger.js';
 import { handleInteractionError, replyUserError, ErrorTypes } from '../../utils/errorHandler.js';
 import { buildAssistanceSelectRow } from '../../utils/ticket/assistancePanel.js';
+import { TICKET_PANEL_COLOR, TICKET_PANEL_BANNER_URL } from '../../utils/ticket/ticketPanelStyle.js';
 
 import ticketConfig from './modules/ticket_dashboard.js';
 
@@ -137,10 +138,11 @@ const panelMessage = interaction.options.getString("panel_message") || "Click th
             const maxTicketsPerUser = interaction.options.getInteger("max_tickets_per_user") || 3;
 const dmOnClose = interaction.options.getBoolean("dm_on_close") !== false;
 
-            const setupEmbed = createEmbed({ 
-                title: "Support Tickets", 
+            const setupEmbed = createEmbed({
+                title: "Support Tickets",
 description: panelMessage,
-                color: getColor('info')
+                color: TICKET_PANEL_COLOR,
+                image: TICKET_PANEL_BANNER_URL,
             });
 
             const ticketButton = new ActionRowBuilder().addComponents(
