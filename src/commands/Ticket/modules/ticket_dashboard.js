@@ -359,27 +359,32 @@ async function handlePanelMessage(selectInteraction, rootInteraction, guildConfi
 
     if (!submitted) return;
 
-    const newMessage = submitted.fields.getTextInputValue('panel_msg_input').trim();
-    guildConfig.ticketPanelMessage = newMessage;
-    await setGuildConfig(client, guildId, guildConfig);
+    try {
+        const newMessage = submitted.fields.getTextInputValue('panel_msg_input').trim();
+        guildConfig.ticketPanelMessage = newMessage;
+        await setGuildConfig(client, guildId, guildConfig);
 
-    const panelUpdated = await updateLivePanel(client, rootInteraction.guild, guildConfig, guildId);
+        const panelUpdated = await updateLivePanel(client, rootInteraction.guild, guildConfig, guildId);
 
-    await submitted.reply({
-        embeds: [
-            successEmbed(
-                '✅ Panel Message Updated',
-                `The panel message has been updated.${
-                    panelUpdated
-                        ? '\nThe live ticket panel has also been refreshed.'
-                        : '\n> **Note:** The live panel could not be located. Use **Repost Panel** on the dashboard to restore it.'
-                }`,
-            ),
-        ],
-        flags: MessageFlags.Ephemeral,
-    });
+        await submitted.reply({
+            embeds: [
+                successEmbed(
+                    '✅ Panel Message Updated',
+                    `The panel message has been updated.${
+                        panelUpdated
+                            ? '\nThe live ticket panel has also been refreshed.'
+                            : '\n> **Note:** The live panel could not be located. Use **Repost Panel** on the dashboard to restore it.'
+                    }`,
+                ),
+            ],
+            flags: MessageFlags.Ephemeral,
+        });
 
-    await refreshDashboard(rootInteraction, guildConfig, guildId, client);
+        await refreshDashboard(rootInteraction, guildConfig, guildId, client);
+    } catch (error) {
+        logger.error('Failed to update ticket panel message:', { error: error.message, stack: error.stack, guildId });
+        await replyUserError(submitted, { type: ErrorTypes.UNKNOWN, message: 'Could not save the panel message. Please try again.' }).catch(() => {});
+    }
 }
 
 async function handleStaffRole(selectInteraction, rootInteraction, guildConfig, guildId, client) {
