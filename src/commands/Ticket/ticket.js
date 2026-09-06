@@ -6,7 +6,7 @@ import { InteractionHelper } from '../../utils/interactionHelper.js';
 import { logger } from '../../utils/logger.js';
 import { handleInteractionError, replyUserError, ErrorTypes } from '../../utils/errorHandler.js';
 import { buildAssistanceSelectRow } from '../../utils/ticket/assistancePanel.js';
-import { TICKET_PANEL_COLOR, TICKET_PANEL_BANNER_URL } from '../../utils/ticket/ticketPanelStyle.js';
+import { TICKET_PANEL_COLOR, buildTicketPanelBannerEmbed } from '../../utils/ticket/ticketPanelStyle.js';
 
 import ticketConfig from './modules/ticket_dashboard.js';
 
@@ -130,12 +130,11 @@ const dmOnClose = interaction.options.getBoolean("dm_on_close") !== false;
             const setupEmbed = createEmbed({
                 description: panelMessage,
                 color: TICKET_PANEL_COLOR,
-                image: TICKET_PANEL_BANNER_URL,
             });
 
             try {
                 const sentPanel = await panelChannel.send({
-                    embeds: [setupEmbed],
+                    embeds: [buildTicketPanelBannerEmbed(), setupEmbed],
                     components: [buildAssistanceSelectRow()],
                 });
 

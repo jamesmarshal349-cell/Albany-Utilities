@@ -24,7 +24,7 @@ import { getGuildConfig, setGuildConfig } from '../../../services/config/guildCo
 import { getGuildTicketStats } from '../../../utils/database/tickets.js';
 import { getUserTicketCount } from '../../../services/ticket.js';
 import { buildAssistanceSelectRow, ASSISTANCE_SELECT_CUSTOM_ID } from '../../../utils/ticket/assistancePanel.js';
-import { TICKET_PANEL_COLOR, TICKET_PANEL_BANNER_URL } from '../../../utils/ticket/ticketPanelStyle.js';
+import { TICKET_PANEL_COLOR, buildTicketPanelBannerEmbed } from '../../../utils/ticket/ticketPanelStyle.js';
 import {
     getTicketPanelStatus,
     messageHasPanelMarker,
@@ -81,11 +81,12 @@ async function persistPanelMessageId(client, guildId, guildConfig, messageId) {
     }
 }
 
-function buildPanelEmbed(config) {
-    return new EmbedBuilder()
+function buildPanelEmbeds(config) {
+    const textEmbed = new EmbedBuilder()
         .setDescription(config.ticketPanelMessage || 'Select a category below to get started.')
-        .setColor(TICKET_PANEL_COLOR)
-        .setImage(TICKET_PANEL_BANNER_URL);
+        .setColor(TICKET_PANEL_COLOR);
+
+    return [buildTicketPanelBannerEmbed(), textEmbed];
 }
 
 async function repostTicketPanel(client, guild, guildConfig, guildId) {
@@ -99,7 +100,7 @@ async function repostTicketPanel(client, guild, guildConfig, guildId) {
     }
 
     const sentPanel = await channel.send({
-        embeds: [buildPanelEmbed(guildConfig)],
+        embeds: buildPanelEmbeds(guildConfig),
         components: [buildAssistanceSelectRow()],
     });
 
@@ -230,7 +231,7 @@ async function updateLivePanel(client, guild, config, guildId) {
         if (!panelStatus.exists || !panelStatus.message) return false;
 
         await panelStatus.message.edit({
-            embeds: [buildPanelEmbed(config)],
+            embeds: buildPanelEmbeds(config),
             components: [buildAssistanceSelectRow()],
         });
         return true;
