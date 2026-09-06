@@ -1,5 +1,5 @@
 import { getColor } from '../../config/bot.js';
-import { SlashCommandBuilder, PermissionFlagsBits, PermissionsBitField, ChannelType, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } from 'discord.js';
+import { SlashCommandBuilder, PermissionFlagsBits, PermissionsBitField, ChannelType, MessageFlags } from 'discord.js';
 import { createEmbed, successEmbed, infoEmbed, warningEmbed } from '../../utils/embeds.js';
 import { getGuildConfig, setGuildConfig } from '../../services/config/guildConfig.js';
 import { InteractionHelper } from '../../utils/interactionHelper.js';
@@ -38,14 +38,6 @@ export default {
                             "The main message/description for the ticket panel.",
                         )
                         .setRequired(true),
-                )
-                .addStringOption((option) =>
-                    option
-                        .setName("button_label")
-                        .setDescription(
-                            "The label for the ticket creation button (default: Create Ticket)",
-                        )
-                        .setRequired(false),
                 )
                 .addChannelOption((option) =>
                     option
@@ -131,32 +123,20 @@ export default {
             const categoryChannel = interaction.options.getChannel("category");
             const closedCategoryChannel = interaction.options.getChannel("closed_category");
             const staffRole = interaction.options.getRole("staff_role");
-const panelMessage = interaction.options.getString("panel_message") || "Click the button below to create a support ticket.";
-            const buttonLabel =
-                interaction.options.getString("button_label") ||
-"Create Ticket";
+const panelMessage = interaction.options.getString("panel_message") || "Select a category below to get started.";
             const maxTicketsPerUser = interaction.options.getInteger("max_tickets_per_user") || 3;
 const dmOnClose = interaction.options.getBoolean("dm_on_close") !== false;
 
             const setupEmbed = createEmbed({
-                title: "Support Tickets",
-description: panelMessage,
+                description: panelMessage,
                 color: TICKET_PANEL_COLOR,
                 image: TICKET_PANEL_BANNER_URL,
             });
 
-            const ticketButton = new ActionRowBuilder().addComponents(
-                new ButtonBuilder()
-                    .setCustomId("create_ticket")
-.setLabel(buttonLabel)
-                    .setStyle(ButtonStyle.Primary)
-                    .setEmoji("📩"),
-            );
-
             try {
                 const sentPanel = await panelChannel.send({
                     embeds: [setupEmbed],
-                    components: [ticketButton, buildAssistanceSelectRow()],
+                    components: [buildAssistanceSelectRow()],
                 });
 
                 if (client.db && interaction.guildId) {
@@ -167,7 +147,6 @@ description: panelMessage,
                     currentConfig.ticketPanelChannelId = panelChannel.id;
                     currentConfig.ticketPanelMessageId = sentPanel?.id || null;
                     currentConfig.ticketPanelMessage = panelMessage;
-                    currentConfig.ticketButtonLabel = buttonLabel;
                     currentConfig.maxTicketsPerUser = maxTicketsPerUser;
                     currentConfig.dmOnClose = dmOnClose;
 

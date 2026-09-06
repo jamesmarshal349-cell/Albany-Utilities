@@ -2,6 +2,8 @@
  * Shared helpers for detecting bot-posted panel messages (tickets, verification, etc.)
  */
 
+import { ASSISTANCE_SELECT_CUSTOM_ID } from './ticket/assistancePanel.js';
+
 export function messageHasButtonCustomId(message, buttonCustomId) {
     if (!message?.components?.length || !buttonCustomId) return false;
 
@@ -115,6 +117,7 @@ export async function getTicketPanelStatus(client, guild, config) {
         channelId: config.ticketPanelChannelId,
         messageId: config.ticketPanelMessageId,
         buttonCustomId: 'create_ticket',
+        selectCustomId: ASSISTANCE_SELECT_CUSTOM_ID,
     });
 }
 
