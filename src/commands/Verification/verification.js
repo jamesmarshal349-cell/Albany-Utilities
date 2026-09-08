@@ -1,12 +1,13 @@
-import { botConfig, getColor } from '../../config/bot.js';
-import { SlashCommandBuilder, PermissionFlagsBits, ChannelType, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } from 'discord.js';
-import { createEmbed, infoEmbed, successEmbed } from '../../utils/embeds.js';
+import { botConfig } from '../../config/bot.js';
+import { SlashCommandBuilder, PermissionFlagsBits, ChannelType, MessageFlags } from 'discord.js';
+import { infoEmbed, successEmbed } from '../../utils/embeds.js';
 import { getGuildConfig, setGuildConfig } from '../../services/config/guildConfig.js';
 import { withErrorHandling, createError, ErrorTypes, replyUserError } from '../../utils/errorHandler.js';
 import { removeVerification, verifyUser } from '../../services/verificationService.js';
 import { logger } from '../../utils/logger.js';
 import { InteractionHelper } from '../../utils/interactionHelper.js';
 import { getWelcomeConfig } from '../../utils/database.js';
+import { buildVerificationPanelContainer, buildVerificationBannerAttachment } from '../../utils/verification/verificationPanelStyle.js';
 import verificationDashboard from './modules/verification_dashboard.js';
 
 export default {
@@ -181,23 +182,10 @@ async function handleSetup(interaction, guild, client) {
 
     await InteractionHelper.safeDefer(interaction);
 
-    const verifyEmbed = createEmbed({
-        title: "Server Verification",
-        description: message,
-        color: getColor('success')
-    });
-
-    const verifyButton = new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-            .setCustomId("verify_user")
-            .setLabel(buttonText)
-            .setStyle(ButtonStyle.Success)
-            .setEmoji("✅")
-    );
-
     const verifyMessage = await verificationChannel.send({
-        embeds: [verifyEmbed],
-        components: [verifyButton]
+        components: [buildVerificationPanelContainer(message, buttonText)],
+        files: [buildVerificationBannerAttachment()],
+        flags: MessageFlags.IsComponentsV2,
     });
 
     guildConfig.verification = {

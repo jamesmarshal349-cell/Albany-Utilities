@@ -27,8 +27,9 @@ import {
     formatPanelStatusField,
 } from '../../../utils/panelStatus.js';
 import { startDashboardSession } from '../../../utils/dashboardSession.js';
+import { buildVerificationPanelContainer, buildVerificationBannerAttachment } from '../../../utils/verification/verificationPanelStyle.js';
 
-async function updateLivePanel(guild, cfg) {
+async function updateLivePanel(guild, cfg, guildId, client) {
     if (!cfg.channelId || !cfg.messageId) return;
     try {
         const channel = guild.channels.cache.get(cfg.channelId);
@@ -36,20 +37,30 @@ async function updateLivePanel(guild, cfg) {
         const msg = await channel.messages.fetch(cfg.messageId).catch(() => null);
         if (!msg) return;
 
-        const verifyEmbed = new EmbedBuilder()
-            .setTitle('Server Verification')
-            .setDescription(cfg.message || botConfig.verification.defaultMessage)
-            .setColor(getColor('success'));
+        const message = cfg.message || botConfig.verification.defaultMessage;
+        const buttonText = cfg.buttonText || botConfig.verification.defaultButtonText;
 
-        const verifyButton = new ActionRowBuilder().addComponents(
-            new ButtonBuilder()
-                .setCustomId('verify_user')
-                .setLabel(cfg.buttonText || botConfig.verification.defaultButtonText)
-                .setStyle(ButtonStyle.Success)
-                .setEmoji('✅'),
-        );
+        const payload = {
+            components: [buildVerificationPanelContainer(message, buttonText)],
+            files: [buildVerificationBannerAttachment()],
+            flags: MessageFlags.IsComponentsV2,
+        };
 
-        await msg.edit({ embeds: [verifyEmbed], components: [verifyButton] });
+        try {
+            await msg.edit({ ...payload, content: null, embeds: null });
+        } catch (editError) {
+            // Older panels may not convert to Components V2 via edit — repost fresh instead.
+            logger.warn('Could not edit verification panel in place, reposting instead:', editError.message);
+            await msg.delete().catch(() => {});
+            const freshMsg = await channel.send(payload);
+            cfg.messageId = freshMsg.id;
+
+            if (guildId && client) {
+                const latestConfig = await getGuildConfig(client, guildId);
+                latestConfig.verification = cfg;
+                await setGuildConfig(client, guildId, latestConfig);
+            }
+        }
     } catch (error) {
         logger.warn('Could not update live verification panel:', error.message);
     }
@@ -155,20 +166,14 @@ async function repostVerificationPanel(guild, cfg) {
         );
     }
 
-    const verifyEmbed = new EmbedBuilder()
-        .setTitle('Server Verification')
-        .setDescription(cfg.message || botConfig.verification.defaultMessage)
-        .setColor(getColor('success'));
+    const message = cfg.message || botConfig.verification.defaultMessage;
+    const buttonText = cfg.buttonText || botConfig.verification.defaultButtonText;
 
-    const verifyButton = new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-            .setCustomId('verify_user')
-            .setLabel(cfg.buttonText || botConfig.verification.defaultButtonText)
-            .setStyle(ButtonStyle.Success)
-            .setEmoji('✅'),
-    );
-
-    return channel.send({ embeds: [verifyEmbed], components: [verifyButton] });
+    return channel.send({
+        components: [buildVerificationPanelContainer(message, buttonText)],
+        files: [buildVerificationBannerAttachment()],
+        flags: MessageFlags.IsComponentsV2,
+    });
 }
 
 async function refreshDashboard(rootInteraction, cfg, guildId, client) {
@@ -451,20 +456,14 @@ async function handleChannel(selectInteraction, rootInteraction, cfg, guildId, c
 
         if (cfg.enabled !== false) {
             try {
-                const verifyEmbed = new EmbedBuilder()
-                    .setTitle('Server Verification')
-                    .setDescription(cfg.message || botConfig.verification.defaultMessage)
-                    .setColor(getColor('success'));
+                const message = cfg.message || botConfig.verification.defaultMessage;
+                const buttonText = cfg.buttonText || botConfig.verification.defaultButtonText;
 
-                const verifyButton = new ActionRowBuilder().addComponents(
-                    new ButtonBuilder()
-                        .setCustomId('verify_user')
-                        .setLabel(cfg.buttonText || botConfig.verification.defaultButtonText)
-                        .setStyle(ButtonStyle.Success)
-                        .setEmoji('✅'),
-                );
-
-                const newMsg = await newChannel.send({ embeds: [verifyEmbed], components: [verifyButton] });
+                const newMsg = await newChannel.send({
+                    components: [buildVerificationPanelContainer(message, buttonText)],
+                    files: [buildVerificationBannerAttachment()],
+                    flags: MessageFlags.IsComponentsV2,
+                });
                 cfg.messageId = newMsg.id;
             } catch (error) {
                 logger.warn('Could not post verification panel in new channel:', error.message);
@@ -604,7 +603,7 @@ async function handleMessage(selectInteraction, rootInteraction, cfg, guildId, c
         latestConfig.verification = cfg;
         await setGuildConfig(client, guildId, latestConfig);
 
-        await updateLivePanel(rootInteraction.guild, cfg);
+        await updateLivePanel(rootInteraction.guild, cfg, guildId, client);
 
         await submitted.reply({
             embeds: [successEmbed('Message Updated', 'The verification panel has been updated with the new message.')],
@@ -654,7 +653,7 @@ async function handleButtonText(selectInteraction, rootInteraction, cfg, guildId
         latestConfig.verification = cfg;
         await setGuildConfig(client, guildId, latestConfig);
 
-        await updateLivePanel(rootInteraction.guild, cfg);
+        await updateLivePanel(rootInteraction.guild, cfg, guildId, client);
 
         await submitted.reply({
             embeds: [successEmbed('Button Text Updated', `The verify button now reads **${cfg.buttonText}**.`)],
