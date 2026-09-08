@@ -19,3 +19,15 @@ export function getPriorityMap() {
 }
 
 export const PRIORITY_MAP = getPriorityMap();
+
+// Discord channel names must be lowercase with no spaces; this keeps only
+// alphanumerics and hyphens so arbitrary usernames/text are always safe to use.
+export function sanitizeForChannelName(text, fallback = 'user') {
+    const cleaned = String(text ?? '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '')
+        .slice(0, 50);
+
+    return cleaned || fallback;
+}

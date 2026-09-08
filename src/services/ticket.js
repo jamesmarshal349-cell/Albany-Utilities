@@ -79,7 +79,7 @@ export const getUserTicketCount = wrapServiceBoundary(async function getUserTick
   context: {},
 });
 
-export async function createTicket(guild, member, categoryId, reason = 'No reason provided', priority = 'none') {
+export async function createTicket(guild, member, categoryId, reason = 'No reason provided', priority = 'none', options = {}) {
   try {
     const config = await getGuildConfig(guild.client, guild.id);
     const ticketConfig = config.tickets || {};
@@ -117,8 +117,8 @@ export async function createTicket(guild, member, categoryId, reason = 'No reaso
     }
     
     const ticketNumber = await getNextTicketNumber(guild.id);
-    
-    let channelName = `ticket-${ticketNumber}`;
+
+    let channelName = options.namePrefix ? `${options.namePrefix}-${ticketNumber}` : `ticket-${ticketNumber}`;
     
     if (priority !== 'none') {
       const priorityInfo = PRIORITY_MAP[priority];

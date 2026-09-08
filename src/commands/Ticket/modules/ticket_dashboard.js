@@ -23,7 +23,7 @@ import { TitanBotError, ErrorTypes, replyUserError } from '../../../utils/errorH
 import { getGuildConfig, setGuildConfig } from '../../../services/config/guildConfig.js';
 import { getGuildTicketStats } from '../../../utils/database/tickets.js';
 import { getUserTicketCount } from '../../../services/ticket.js';
-import { buildAssistanceSelectRow, ASSISTANCE_SELECT_CUSTOM_ID } from '../../../utils/ticket/assistancePanel.js';
+import { buildAssistanceSelectRow, ASSISTANCE_SELECT_CUSTOM_ID, ASSISTANCE_TOPICS } from '../../../utils/ticket/assistancePanel.js';
 import { buildTicketPanelContainer } from '../../../utils/ticket/ticketPanelStyle.js';
 import {
     getTicketPanelStatus,
@@ -120,6 +120,11 @@ function buildDashboardEmbed(config, guild, panelStatus = null, ticketStats = nu
     const closedCategoryChannel = config.ticketClosedCategoryId ? guild.channels.cache.get(config.ticketClosedCategoryId) : null;
     const closedCategory = closedCategoryChannel ? closedCategoryChannel.toString() : '`Not set`';
 
+    const assistanceCategories = ASSISTANCE_TOPICS.map((topic) => {
+        const categoryId = config.assistanceCategoryIds?.[topic.categoryConfigKey];
+        return `**${topic.label}:** ${categoryId ? `<#${categoryId}>` : '`Not set`'}`;
+    }).join('\n');
+
     const rawMsg = config.ticketPanelMessage || 'Select a category below to get started.';
     const panelMsg = `\`${rawMsg.length > 60 ? rawMsg.substring(0, 60) + '…' : rawMsg}\``;
 
@@ -143,6 +148,7 @@ function buildDashboardEmbed(config, guild, panelStatus = null, ticketStats = nu
             { name: 'Open Tickets Category', value: openCategory, inline: true },
             { name: 'Closed Tickets Category', value: closedCategory, inline: true },
             { name: '\u200B', value: '\u200B', inline: true },
+            { name: 'Assistance Topic Categories', value: assistanceCategories, inline: false },
             { name: 'Panel Message', value: panelMsg, inline: false },
             { name: 'Max Tickets/User', value: String(config.maxTicketsPerUser || 3), inline: true },
             { name: 'DM on Close', value: config.dmOnClose !== false ? 'Enabled' : 'Disabled', inline: true },
@@ -177,6 +183,13 @@ function buildSelectMenu(guildId) {
                 .setDescription('Category where closed tickets are moved')
                 .setValue('closed_category')
                 .setEmoji('📂'),
+            ...ASSISTANCE_TOPICS.map((topic) =>
+                new StringSelectMenuOptionBuilder()
+                    .setLabel(`Change ${topic.label} Category`)
+                    .setDescription(`Category where "${topic.label}" tickets are created`)
+                    .setValue(`assist_cat_${topic.value}`)
+                    .setEmoji('📁'),
+            ),
             new StringSelectMenuOptionBuilder()
                 .setLabel('Set Max Tickets per User')
                 .setDescription('Limit how many open tickets one user can have at once')
@@ -283,6 +296,16 @@ export default {
                     customId === `ticket_cfg_delete_${guildId}`,
                 onSelect: async (selectInteraction) => {
                     const selectedOption = selectInteraction.values[0];
+
+                    if (selectedOption.startsWith('assist_cat_')) {
+                        const topicValue = selectedOption.slice('assist_cat_'.length);
+                        const topic = ASSISTANCE_TOPICS.find((t) => t.value === topicValue);
+                        if (topic) {
+                            await handleAssistanceCategory(selectInteraction, interaction, guildConfig, guildId, client, topic);
+                        }
+                        return;
+                    }
+
                     switch (selectedOption) {
                         case 'panel_message':
                             await handlePanelMessage(selectInteraction, interaction, guildConfig, guildId, client);
@@ -490,6 +513,71 @@ async function handleOpenCategory(selectInteraction, rootInteraction, guildConfi
                 successEmbed(
                     'Open Category Updated',
                     `New tickets will now be created in **${category.name}**.`,
+                ),
+            ],
+            flags: MessageFlags.Ephemeral,
+        });
+
+        await refreshDashboard(rootInteraction, guildConfig, guildId, client);
+    });
+
+    catCollector.on('end', (collected, reason) => {
+        if (reason === 'time' && collected.size === 0) {
+            replyUserError(selectInteraction, {
+                type: ErrorTypes.RATE_LIMIT,
+                message: 'No category was selected. The setting was not changed.',
+            }).catch(() => {});
+        }
+    });
+}
+
+async function handleAssistanceCategory(selectInteraction, rootInteraction, guildConfig, guildId, client, topic) {
+    await selectInteraction.deferUpdate();
+
+    const customId = `ticket_cfg_assist_cat_${topic.value}`;
+    const currentCategoryId = guildConfig.assistanceCategoryIds?.[topic.categoryConfigKey];
+
+    const channelSelect = new ChannelSelectMenuBuilder()
+        .setCustomId(customId)
+        .setPlaceholder('Select a category...')
+        .addChannelTypes(ChannelType.GuildCategory)
+        .setMaxValues(1);
+
+    await selectInteraction.followUp({
+        embeds: [
+            new EmbedBuilder()
+                .setTitle(`📁 Change ${topic.label} Category`)
+                .setDescription(
+                    `**Current:** ${currentCategoryId ? `<#${currentCategoryId}>` : '`Not set (falls back to the Open Tickets Category)`'}\n\nSelect the category where **${topic.label}** tickets will be created.`,
+                )
+                .setColor(getColor('info')),
+        ],
+        components: [new ActionRowBuilder().addComponents(channelSelect)],
+        flags: MessageFlags.Ephemeral,
+    });
+
+    const catCollector = rootInteraction.channel.createMessageComponentCollector({
+        componentType: ComponentType.ChannelSelect,
+        filter: i => i.user.id === selectInteraction.user.id && i.customId === customId,
+        time: 60_000,
+        max: 1,
+    });
+
+    catCollector.on('collect', async catInteraction => {
+        await catInteraction.deferUpdate();
+        const category = catInteraction.channels.first();
+
+        guildConfig.assistanceCategoryIds = {
+            ...(guildConfig.assistanceCategoryIds || {}),
+            [topic.categoryConfigKey]: category.id,
+        };
+        await setGuildConfig(client, guildId, guildConfig);
+
+        await catInteraction.followUp({
+            embeds: [
+                successEmbed(
+                    `${topic.label} Category Updated`,
+                    `**${topic.label}** tickets will now be created in **${category.name}**.`,
                 ),
             ],
             flags: MessageFlags.Ephemeral,
@@ -891,6 +979,7 @@ async function handleDeleteSystem(btnInteraction, rootInteraction, guildConfig, 
         'ticketStaffRoleId',
         'ticketCategoryId',
         'ticketClosedCategoryId',
+        'assistanceCategoryIds',
         'ticketPanelMessage',
         'ticketButtonLabel',
         'maxTicketsPerUser',

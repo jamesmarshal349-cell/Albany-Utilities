@@ -2,7 +2,8 @@ import { MessageFlags } from 'discord.js';
 import { successEmbed } from '../../../utils/embeds.js';
 import { createTicket } from '../../../services/ticket.js';
 import { getGuildConfig } from '../../../services/config/guildConfig.js';
-import { getAssistanceTopic, ASSISTANCE_TICKET_MODAL_CUSTOM_ID } from '../../../utils/ticket/assistancePanel.js';
+import { getAssistanceTopic, getAssistanceCategoryId, ASSISTANCE_TICKET_MODAL_CUSTOM_ID } from '../../../utils/ticket/assistancePanel.js';
+import { sanitizeForChannelName } from '../../../utils/helpers.js';
 import { InteractionHelper } from '../../../utils/interactionHelper.js';
 import { replyUserError, ErrorTypes, handleInteractionError } from '../../../utils/errorHandler.js';
 
@@ -26,13 +27,16 @@ export default {
 
             const reason = interaction.fields.getTextInputValue('reason');
             const config = await getGuildConfig(client, interaction.guildId);
-            const categoryId = config.ticketCategoryId || null;
+            const categoryId = getAssistanceCategoryId(config, topic);
+            const namePrefix = `${sanitizeForChannelName(interaction.user.username)}-${topic.slug}`;
 
             const { channel } = await createTicket(
                 interaction.guild,
                 interaction.member,
                 categoryId,
                 `${topic.label}: ${reason}`,
+                'none',
+                { namePrefix },
             );
 
             await interaction.editReply({
