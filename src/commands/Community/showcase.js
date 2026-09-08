@@ -6,8 +6,11 @@ import {
     ContainerBuilder,
     MediaGalleryBuilder,
     MediaGalleryItemBuilder,
+    TextDisplayBuilder,
+    SeparatorBuilder,
 } from 'discord.js';
 import { getColor } from '../../config/bot.js';
+import { TICKET_PANEL_COLOR } from '../../utils/ticket/ticketPanelStyle.js';
 import { InteractionHelper } from '../../utils/interactionHelper.js';
 import { successEmbed } from '../../utils/embeds.js';
 import { replyUserError, ErrorTypes, handleInteractionError } from '../../utils/errorHandler.js';
@@ -62,12 +65,12 @@ export default {
             const fileName = attachment.name || 'showcase.png';
             const file = new AttachmentBuilder(buffer, { name: fileName });
 
-            await targetChannel.send({
-                content: `-# ${SHOWCASE_EMOJI} ${interaction.user}`,
-            });
-
             const container = new ContainerBuilder()
-                .setAccentColor(getColor('info'))
+                .setAccentColor(getColor(TICKET_PANEL_COLOR))
+                .addTextDisplayComponents(
+                    new TextDisplayBuilder().setContent(`-# ${SHOWCASE_EMOJI} ${interaction.user}`),
+                )
+                .addSeparatorComponents(new SeparatorBuilder())
                 .addMediaGalleryComponents(
                     new MediaGalleryBuilder().addItems(
                         new MediaGalleryItemBuilder().setURL(`attachment://${fileName}`),
