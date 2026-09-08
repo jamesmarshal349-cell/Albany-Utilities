@@ -4,13 +4,11 @@ import { successEmbed } from '../../utils/embeds.js';
 import { replyUserError, ErrorTypes, handleInteractionError } from '../../utils/errorHandler.js';
 import { setGuildConfig } from '../../services/config/guildConfig.js';
 import {
-    resolveRobloxUsername,
-    fetchRobloxAvatarUrl,
-    setPendingLink,
+    createAuthorizationUrl,
     getRobloxLink,
     removeRobloxLink,
 } from '../../services/robloxVerificationService.js';
-import { buildRobloxConfirmReply } from '../../utils/verification/robloxVerificationUi.js';
+import { buildRobloxSignInReply } from '../../utils/verification/robloxVerificationUi.js';
 
 async function handleSetup(interaction, config, client) {
     if (!interaction.member.permissions.has(PermissionFlagsBits.ManageGuild)) {
@@ -33,21 +31,9 @@ async function handleLink(interaction) {
     const deferred = await InteractionHelper.safeDefer(interaction, { flags: MessageFlags.Ephemeral });
     if (!deferred) return;
 
-    const username = interaction.options.getString('username');
-
     try {
-        const existing = await getRobloxLink(interaction.user.id);
-        if (existing) {
-            await replyUserError(interaction, { type: ErrorTypes.VALIDATION, message: `You're already linked to **${existing.robloxUsername}**. Run \`/verifyroblox unlink\` first if you want to link a different account.` });
-            return;
-        }
-
-        const robloxUser = await resolveRobloxUsername(username);
-        const avatarUrl = await fetchRobloxAvatarUrl(robloxUser.id);
-
-        await setPendingLink(interaction.user.id, { robloxId: robloxUser.id, robloxUsername: robloxUser.name });
-
-        await InteractionHelper.safeEditReply(interaction, buildRobloxConfirmReply(robloxUser, avatarUrl));
+        const authorizationUrl = await createAuthorizationUrl(interaction.user.id, interaction.guildId);
+        await InteractionHelper.safeEditReply(interaction, buildRobloxSignInReply(authorizationUrl));
     } catch (error) {
         await handleInteractionError(interaction, error, { commandName: 'verifyroblox', source: 'verifyroblox_link' });
     }
@@ -77,13 +63,7 @@ export default {
         .addSubcommand((subcommand) =>
             subcommand
                 .setName('link')
-                .setDescription('Link a Roblox account')
-                .addStringOption((option) =>
-                    option
-                        .setName('username')
-                        .setDescription('Your Roblox username')
-                        .setRequired(true),
-                ),
+                .setDescription('Sign in with Roblox to link your account'),
         )
         .addSubcommand((subcommand) =>
             subcommand

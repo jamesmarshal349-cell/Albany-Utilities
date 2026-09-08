@@ -122,6 +122,10 @@ export function getRobloxPendingKey(userId) {
     return `roblox:pending:${userId}`;
 }
 
+export function getRobloxOAuthStateKey(state) {
+    return `roblox:oauth_state:${state}`;
+}
+
 export function getServerCountersKey(guildId) {
     return `guild:${guildId}:counters`;
 }

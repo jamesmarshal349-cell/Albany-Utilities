@@ -2,26 +2,21 @@ import { ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
 import { createEmbed } from '../embeds.js';
 import { getColor } from '../../config/bot.js';
 
-export const ROBLOX_CONFIRM_BUTTON_ID = 'roblox_verify_confirm';
-
-export function buildRobloxConfirmReply(robloxUser, avatarUrl) {
-    const nameLine = robloxUser.displayName && robloxUser.displayName !== robloxUser.name
-        ? `**${robloxUser.name}** (${robloxUser.displayName})`
-        : `**${robloxUser.name}**`;
-
+// A Link-style button needs no customId/handler — Discord just opens the URL
+// client-side, no interaction is ever sent to the bot for it.
+export function buildRobloxSignInReply(authorizationUrl) {
     const embed = createEmbed({
-        title: 'Is this you?',
-        description: nameLine,
+        title: 'Verify with Roblox',
+        description: 'Click the button below to sign in with your Roblox account. You\'ll be verified automatically once you approve access.',
         color: getColor('info'),
-        thumbnail: avatarUrl || null,
     });
 
     const row = new ActionRowBuilder().addComponents(
         new ButtonBuilder()
-            .setCustomId(ROBLOX_CONFIRM_BUTTON_ID)
-            .setLabel("Yes, that's me")
-            .setStyle(ButtonStyle.Success)
-            .setEmoji('✅'),
+            .setLabel('Sign in with Roblox')
+            .setStyle(ButtonStyle.Link)
+            .setURL(authorizationUrl)
+            .setEmoji('🔗'),
     );
 
     return { embeds: [embed], components: [row] };
