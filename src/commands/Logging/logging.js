@@ -27,7 +27,8 @@ export default {
                         .setDescription('Which log destination to configure.')
                         .setRequired(true)
                         .addChoices(
-                            { name: 'Audit (moderation, messages, members…)', value: 'audit' },
+                            { name: 'Audit (messages, members, roles…)', value: 'audit' },
+                            { name: 'Moderation (warns, kicks, bans…)', value: 'moderation' },
                             { name: 'Applications', value: 'applications' },
                             { name: 'Reports', value: 'reports' },
                         ),

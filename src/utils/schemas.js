@@ -15,8 +15,9 @@ export const LoggingChannelsSchema = z
     audit: z.string().nullable().optional(),
     applications: z.string().nullable().optional(),
     reports: z.string().nullable().optional(),
+    moderation: z.string().nullable().optional(),
   })
-  .default({ audit: null, applications: null, reports: null });
+  .default({ audit: null, applications: null, reports: null, moderation: null });
 
 export const LoggingConfigSchema = z
   .object({

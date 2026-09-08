@@ -247,6 +247,14 @@ export class ModerationService {
 
       this.assertModerationHierarchy(moderator, member, 'kick');
 
+      if (member.permissions.has(PermissionFlagsBits.Administrator)) {
+        throw new TitanBotError(
+          'Cannot kick an Administrator',
+          ErrorTypes.PERMISSION,
+          `I cannot kick **${getTargetLabel(member)}** — members with the **Administrator** permission are protected from moderation actions, regardless of role hierarchy.`
+        );
+      }
+
       if (!member.kickable) {
         const targetLabel = getTargetLabel(member);
         throw new TitanBotError(
