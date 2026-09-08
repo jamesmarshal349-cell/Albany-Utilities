@@ -10,6 +10,7 @@ const DESTINATION_LABELS = {
   applications: 'Applications',
   reports: 'Reports',
   moderation: 'Moderation',
+  member: 'Member',
 };
 
 export default {

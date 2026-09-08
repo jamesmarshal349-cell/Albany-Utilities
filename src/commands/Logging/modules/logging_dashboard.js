@@ -47,6 +47,9 @@ export async function buildLoggingDashboardView(interaction, client) {
   const moderationChannel = channels.moderation
     ? await formatChannelMention(interaction.guild, channels.moderation)
     : `${auditChannel} (using Audit — set with \`/logging channel destination:Moderation\`)`;
+  const memberChannel = channels.member
+    ? await formatChannelMention(interaction.guild, channels.member)
+    : `${auditChannel} (using Audit — set with \`/logging channel destination:Member\`)`;
   const applicationsChannel = await formatChannelMention(interaction.guild, channels.applications);
   const reportsChannel = await formatChannelMention(interaction.guild, channels.reports);
   const lifecycleChannel = await formatChannelMention(interaction.guild, guildConfig.ticketLogsChannelId);
@@ -80,6 +83,7 @@ export async function buildLoggingDashboardView(interaction, client) {
         value: [
           `**Audit:** ${auditChannel}`,
           `**Moderation:** ${moderationChannel}`,
+          `**Member:** ${memberChannel}`,
           `**Applications:** ${applicationsChannel}`,
           `**Reports:** ${reportsChannel}`,
         ].join('\n'),
