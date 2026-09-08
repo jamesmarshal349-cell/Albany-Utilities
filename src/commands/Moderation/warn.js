@@ -4,6 +4,7 @@ import { logModerationAction } from '../../utils/moderation.js';
 import { logger } from '../../utils/logger.js';
 import { WarningService } from '../../services/moderation/warningService.js';
 import { ModerationService } from '../../services/moderation/moderationService.js';
+import { maybeEscalateWarning } from '../../services/moderation/escalationService.js';
 import { TitanBotError, ErrorTypes } from '../../utils/errorHandler.js';
 import { InteractionHelper } from '../../utils/interactionHelper.js';
 export default {
@@ -70,13 +71,27 @@ export default {
 
         ModerationService.assertModerationHierarchy(interaction.member, member, 'warn');
 
-        const { id, totalCount } = await WarningService.addWarning({
+        const { id } = await WarningService.addWarning({
             guildId,
             userId: target.id,
             moderatorId: moderator.id,
             reason,
             timestamp: Date.now()
         });
+
+        const activeCount = await WarningService.getWarningCount(guildId, target.id);
+
+        if (config.moderationDmOnPunishment !== false) {
+            await target.send({
+                embeds: [
+                    createEmbed({
+                        title: '⚠️ You have been warned',
+                        description: `You have been warned in **${interaction.guild.name}**.\n\n**Reason:** ${reason}\n**Total Warnings:** ${activeCount}`,
+                        color: '#e74c3c',
+                    }),
+                ],
+            }).catch(() => {});
+        }
 
         await logModerationAction({
             client,
@@ -89,18 +104,26 @@ export default {
                 metadata: {
                     userId: target.id,
                     moderatorId: moderator.id,
-                    totalWarns: totalCount,
-                    warningNumber: totalCount,
+                    totalWarns: activeCount,
+                    warningNumber: activeCount,
                     warningId: id
                 }
             }
         });
 
+        const escalation = await maybeEscalateWarning({ guild: interaction.guild, member, activeWarningCount: activeCount });
+
+        let description = `**Reason:** ${reason}\n**Total Warns:** ${activeCount}`;
+        if (escalation) {
+            const actionLabel = { timeout: 'timed out', kick: 'kicked', ban: 'banned' }[escalation.action];
+            description += `\n\n🚨 **Escalation triggered:** reaching ${escalation.threshold} warnings automatically **${actionLabel}** this user.`;
+        }
+
         await InteractionHelper.safeEditReply(interaction, {
             embeds: [
                 successEmbed(
                     `⚠️ **Warned** ${target.tag}`,
-                    `**Reason:** ${reason}\n**Total Warns:** ${totalCount}`,
+                    description,
                 ),
             ],
         });

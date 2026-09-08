@@ -4,9 +4,26 @@ import { PermissionFlagsBits } from 'discord.js';
 import { logger } from '../../utils/logger.js';
 import { TitanBotError, ErrorTypes } from '../../utils/errorHandler.js';
 import { logModerationAction } from '../../utils/moderation.js';
+import { createEmbed } from '../../utils/embeds.js';
+import { getGuildConfig } from '../config/guildConfig.js';
 
 function getTargetLabel(target) {
   return target.user?.tag ?? target.displayName ?? 'this user';
+}
+
+// Best-effort DM to the punished user — failures (DMs closed, blocked, etc.) are
+// expected and never block the actual moderation action.
+async function sendPunishmentDm({ guild, user, title, description }) {
+  try {
+    const config = await getGuildConfig(guild.client, guild.id);
+    if (config.moderationDmOnPunishment === false) return false;
+
+    await user.send({ embeds: [createEmbed({ title, description, color: '#e74c3c' })] });
+    return true;
+  } catch (error) {
+    logger.debug(`Could not DM ${user.id} about a moderation action: ${error.message}`);
+    return false;
+  }
 }
 
 function getHighestRole(member) {
@@ -174,6 +191,13 @@ export class ModerationService {
         }
       }
 
+      await sendPunishmentDm({
+        guild,
+        user,
+        title: '🔨 You have been banned',
+        description: `You have been banned from **${guild.name}**.\n\n**Reason:** ${reason}`,
+      });
+
       await guild.members.ban(user.id, { reason });
 
       const caseId = await logModerationAction({
@@ -233,6 +257,13 @@ export class ModerationService {
         );
       }
 
+      await sendPunishmentDm({
+        guild,
+        user: member.user,
+        title: '👢 You have been kicked',
+        description: `You have been kicked from **${guild.name}**.\n\n**Reason:** ${reason}`,
+      });
+
       await member.kick(reason);
 
       const caseId = await logModerationAction({
@@ -291,9 +322,17 @@ export class ModerationService {
         );
       }
 
+      const durationMinutes = Math.floor(durationMs / 60000);
+
+      await sendPunishmentDm({
+        guild,
+        user: member.user,
+        title: '🔇 You have been timed out',
+        description: `You have been timed out in **${guild.name}** for **${durationMinutes} minute${durationMinutes !== 1 ? 's' : ''}**.\n\n**Reason:** ${reason}`,
+      });
+
       await member.timeout(durationMs, reason);
 
-      const durationMinutes = Math.floor(durationMs / 60000);
       const caseId = await logModerationAction({
         client: guild.client,
         guild,
