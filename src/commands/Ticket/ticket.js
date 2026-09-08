@@ -6,7 +6,7 @@ import { InteractionHelper } from '../../utils/interactionHelper.js';
 import { logger } from '../../utils/logger.js';
 import { handleInteractionError, replyUserError, ErrorTypes } from '../../utils/errorHandler.js';
 import { buildAssistanceSelectRow } from '../../utils/ticket/assistancePanel.js';
-import { TICKET_PANEL_COLOR, buildTicketPanelBannerEmbed } from '../../utils/ticket/ticketPanelStyle.js';
+import { buildTicketPanelContainer } from '../../utils/ticket/ticketPanelStyle.js';
 
 import ticketConfig from './modules/ticket_dashboard.js';
 
@@ -127,15 +127,10 @@ const panelMessage = interaction.options.getString("panel_message") || "Select a
             const maxTicketsPerUser = interaction.options.getInteger("max_tickets_per_user") || 3;
 const dmOnClose = interaction.options.getBoolean("dm_on_close") !== false;
 
-            const setupEmbed = createEmbed({
-                description: panelMessage,
-                color: TICKET_PANEL_COLOR,
-            });
-
             try {
                 const sentPanel = await panelChannel.send({
-                    embeds: [buildTicketPanelBannerEmbed(), setupEmbed],
-                    components: [buildAssistanceSelectRow()],
+                    components: [buildTicketPanelContainer({ ticketPanelMessage: panelMessage }, buildAssistanceSelectRow())],
+                    flags: MessageFlags.IsComponentsV2,
                 });
 
                 if (client.db && interaction.guildId) {

@@ -24,7 +24,7 @@ import { getGuildConfig, setGuildConfig } from '../../../services/config/guildCo
 import { getGuildTicketStats } from '../../../utils/database/tickets.js';
 import { getUserTicketCount } from '../../../services/ticket.js';
 import { buildAssistanceSelectRow, ASSISTANCE_SELECT_CUSTOM_ID } from '../../../utils/ticket/assistancePanel.js';
-import { TICKET_PANEL_COLOR, buildTicketPanelBannerEmbed } from '../../../utils/ticket/ticketPanelStyle.js';
+import { buildTicketPanelContainer } from '../../../utils/ticket/ticketPanelStyle.js';
 import {
     getTicketPanelStatus,
     messageHasPanelMarker,
@@ -81,14 +81,6 @@ async function persistPanelMessageId(client, guildId, guildConfig, messageId) {
     }
 }
 
-function buildPanelEmbeds(config) {
-    const textEmbed = new EmbedBuilder()
-        .setDescription(config.ticketPanelMessage || 'Select a category below to get started.')
-        .setColor(TICKET_PANEL_COLOR);
-
-    return [buildTicketPanelBannerEmbed(), textEmbed];
-}
-
 async function repostTicketPanel(client, guild, guildConfig, guildId) {
     const channel = await guild.channels.fetch(guildConfig.ticketPanelChannelId).catch(() => null);
     if (!channel) {
@@ -100,8 +92,8 @@ async function repostTicketPanel(client, guild, guildConfig, guildId) {
     }
 
     const sentPanel = await channel.send({
-        embeds: buildPanelEmbeds(guildConfig),
-        components: [buildAssistanceSelectRow()],
+        components: [buildTicketPanelContainer(guildConfig, buildAssistanceSelectRow())],
+        flags: MessageFlags.IsComponentsV2,
     });
 
     await persistPanelMessageId(client, guildId, guildConfig, sentPanel.id);
@@ -230,10 +222,23 @@ async function updateLivePanel(client, guild, config, guildId) {
         }
         if (!panelStatus.exists || !panelStatus.message) return false;
 
-        await panelStatus.message.edit({
-            embeds: buildPanelEmbeds(config),
-            components: [buildAssistanceSelectRow()],
-        });
+        const payload = {
+            components: [buildTicketPanelContainer(config, buildAssistanceSelectRow())],
+            flags: MessageFlags.IsComponentsV2,
+        };
+
+        try {
+            // A message not already sent as Components V2 needs its old content/embeds
+            // explicitly cleared to convert in place.
+            await panelStatus.message.edit({ ...payload, content: null, embeds: null });
+        } catch (editError) {
+            // Some older panel messages can't be converted via edit — repost fresh instead.
+            logger.warn('Could not edit ticket panel in place, reposting instead:', editError.message);
+            await panelStatus.message.delete().catch(() => {});
+            const freshPanel = await panelStatus.channel.send(payload);
+            await persistPanelMessageId(client, guildId, config, freshPanel.id);
+        }
+
         return true;
     } catch (error) {
         logger.warn('Failed to update live ticket panel:', error.message);

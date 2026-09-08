@@ -1,7 +1,14 @@
 // Ticket panel branding — edit the values below to restyle the panel.
 // No code changes needed elsewhere; just edit this file and redeploy.
 
-import { EmbedBuilder } from 'discord.js';
+import {
+    ContainerBuilder,
+    MediaGalleryBuilder,
+    MediaGalleryItemBuilder,
+    TextDisplayBuilder,
+    SeparatorBuilder,
+} from 'discord.js';
+import { getColor } from '../../config/bot.js';
 
 // Embed color (hex).
 export const TICKET_PANEL_COLOR = '#FFD45E';
@@ -9,14 +16,32 @@ export const TICKET_PANEL_COLOR = '#FFD45E';
 // Banner image shown above the ticket panel text. Must be a direct image URL.
 export const TICKET_PANEL_BANNER_URL = 'https://cdn.tickety.top/images/1471477392412381205/ticketpanels/Isppkn6uSl4ohgF7y02/panelmessage/components/mtk39z2nrp0pok3.webp';
 
-// Discord always renders an embed's "image" at the bottom of that embed — there's no
-// setting to put it at the top. To get a banner-on-top look, we send it as its own
-// embed (image only) immediately followed by the text embed, both the same color, so
-// they read as one continuous card.
-export function buildTicketPanelBannerEmbed() {
-    return new EmbedBuilder()
-        .setColor(TICKET_PANEL_COLOR)
-        .setImage(TICKET_PANEL_BANNER_URL);
+// Built with Components V2 (a Container) instead of a classic embed — this is the only
+// way to get the banner to render above the text, since an embed's "image" field always
+// renders at the bottom no matter what. `assistanceRow` is the ActionRow holding the
+// assistance dropdown; pass null to build the container without it.
+export function buildTicketPanelContainer(config, assistanceRow = null) {
+    const container = new ContainerBuilder()
+        .setAccentColor(getColor(TICKET_PANEL_COLOR))
+        .addMediaGalleryComponents(
+            new MediaGalleryBuilder().addItems(
+                new MediaGalleryItemBuilder().setURL(TICKET_PANEL_BANNER_URL),
+            ),
+        )
+        .addSeparatorComponents(new SeparatorBuilder())
+        .addTextDisplayComponents(
+            new TextDisplayBuilder().setContent(
+                config?.ticketPanelMessage || 'Select a category below to get started.',
+            ),
+        );
+
+    if (assistanceRow) {
+        container
+            .addSeparatorComponents(new SeparatorBuilder())
+            .addActionRowComponents(assistanceRow);
+    }
+
+    return container;
 }
 
 // Custom emoji for each assistance dropdown option.
