@@ -1,20 +1,16 @@
 import { SlashCommandBuilder, PermissionFlagsBits, MessageFlags } from 'discord.js';
 import { InteractionHelper } from '../../utils/interactionHelper.js';
-import { successEmbed, createEmbed } from '../../utils/embeds.js';
-import { getColor } from '../../config/bot.js';
+import { successEmbed } from '../../utils/embeds.js';
 import { replyUserError, ErrorTypes, handleInteractionError } from '../../utils/errorHandler.js';
 import { setGuildConfig } from '../../services/config/guildConfig.js';
 import {
     resolveRobloxUsername,
-    fetchRobloxProfile,
-    startVerification,
-    getPendingVerification,
-    clearPendingVerification,
+    fetchRobloxAvatarUrl,
+    setPendingLink,
     getRobloxLink,
-    saveRobloxLink,
     removeRobloxLink,
 } from '../../services/robloxVerificationService.js';
-import { logger } from '../../utils/logger.js';
+import { buildRobloxConfirmReply } from '../../utils/verification/robloxVerificationUi.js';
 
 async function handleSetup(interaction, config, client) {
     if (!interaction.member.permissions.has(PermissionFlagsBits.ManageGuild)) {
@@ -42,82 +38,18 @@ async function handleLink(interaction) {
     try {
         const existing = await getRobloxLink(interaction.user.id);
         if (existing) {
-            return await replyUserError(interaction, { type: ErrorTypes.VALIDATION, message: `You're already linked to **${existing.robloxUsername}**. Run \`/verifyroblox unlink\` first if you want to link a different account.` });
+            await replyUserError(interaction, { type: ErrorTypes.VALIDATION, message: `You're already linked to **${existing.robloxUsername}**. Run \`/verifyroblox unlink\` first if you want to link a different account.` });
+            return;
         }
 
         const robloxUser = await resolveRobloxUsername(username);
-        const code = await startVerification(interaction.user.id, robloxUser.id, robloxUser.name);
+        const avatarUrl = await fetchRobloxAvatarUrl(robloxUser.id);
 
-        await InteractionHelper.safeEditReply(interaction, {
-            embeds: [
-                createEmbed({
-                    title: '🔗 Verify Your Roblox Account',
-                    description: [
-                        `Linking **${robloxUser.name}** (${robloxUser.displayName})`,
-                        '',
-                        '**Step 1:** Go to your Roblox profile → **Edit Profile** → **About**.',
-                        `**Step 2:** Paste this code anywhere in your About/bio:\n\`\`\`${code}\`\`\``,
-                        '**Step 3:** Come back here and run `/verifyroblox confirm`.',
-                        '',
-                        '_You can remove the code from your bio after verifying. This code expires in 10 minutes._',
-                    ].join('\n'),
-                    color: getColor('info'),
-                }),
-            ],
-        });
+        await setPendingLink(interaction.user.id, { robloxId: robloxUser.id, robloxUsername: robloxUser.name });
+
+        await InteractionHelper.safeEditReply(interaction, buildRobloxConfirmReply(robloxUser, avatarUrl));
     } catch (error) {
         await handleInteractionError(interaction, error, { commandName: 'verifyroblox', source: 'verifyroblox_link' });
-    }
-}
-
-async function handleConfirm(interaction, config) {
-    const deferred = await InteractionHelper.safeDefer(interaction, { flags: MessageFlags.Ephemeral });
-    if (!deferred) return;
-
-    try {
-        const pending = await getPendingVerification(interaction.user.id);
-
-        if (!pending) {
-            await replyUserError(interaction, { type: ErrorTypes.VALIDATION, message: 'You don\'t have a pending verification (or it expired). Run `/verifyroblox link` first.' });
-            return;
-        }
-
-        const profile = await fetchRobloxProfile(pending.robloxId);
-        const bio = profile?.description || '';
-
-        if (!bio.includes(pending.code)) {
-            await replyUserError(interaction, { type: ErrorTypes.VALIDATION, message: `I couldn't find the code **${pending.code}** in your Roblox "About" section yet. Make sure you saved your profile, then run \`/verifyroblox confirm\` again.` });
-            return;
-        }
-
-        await saveRobloxLink(interaction.user.id, { robloxId: pending.robloxId, robloxUsername: pending.robloxUsername });
-        await clearPendingVerification(interaction.user.id);
-
-        const notes = [];
-
-        try {
-            await interaction.member.setNickname(pending.robloxUsername.slice(0, 32));
-            notes.push('✅ Nickname updated.');
-        } catch (nickError) {
-            logger.warn(`Could not set nickname for ${interaction.user.id}: ${nickError.message}`);
-            notes.push('⚠️ Could not update your nickname (I may be missing permission, or your role outranks mine).');
-        }
-
-        if (config.robloxVerifiedRoleId) {
-            try {
-                await interaction.member.roles.add(config.robloxVerifiedRoleId);
-                notes.push('✅ Verified role granted.');
-            } catch (roleError) {
-                logger.warn(`Could not grant Roblox verified role to ${interaction.user.id}: ${roleError.message}`);
-                notes.push('⚠️ Could not grant the verified role (check my role position and permissions).');
-            }
-        }
-
-        await InteractionHelper.safeEditReply(interaction, {
-            embeds: [successEmbed('✅ Roblox Account Verified', `Linked to **${pending.robloxUsername}**.\n\n${notes.join('\n')}`)],
-        });
-    } catch (error) {
-        await handleInteractionError(interaction, error, { commandName: 'verifyroblox', source: 'verifyroblox_confirm' });
     }
 }
 
@@ -145,18 +77,13 @@ export default {
         .addSubcommand((subcommand) =>
             subcommand
                 .setName('link')
-                .setDescription('Start linking a Roblox account')
+                .setDescription('Link a Roblox account')
                 .addStringOption((option) =>
                     option
                         .setName('username')
                         .setDescription('Your Roblox username')
                         .setRequired(true),
                 ),
-        )
-        .addSubcommand((subcommand) =>
-            subcommand
-                .setName('confirm')
-                .setDescription('Finish linking after adding the code to your Roblox bio'),
         )
         .addSubcommand((subcommand) =>
             subcommand
@@ -184,9 +111,6 @@ export default {
         }
         if (subcommand === 'link') {
             return handleLink(interaction);
-        }
-        if (subcommand === 'confirm') {
-            return handleConfirm(interaction, config);
         }
         if (subcommand === 'unlink') {
             return handleUnlink(interaction);

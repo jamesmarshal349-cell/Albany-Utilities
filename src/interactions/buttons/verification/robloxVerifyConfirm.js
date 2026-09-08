@@ -4,10 +4,9 @@ import { replyUserError, ErrorTypes, handleInteractionError } from '../../../uti
 import { InteractionHelper } from '../../../utils/interactionHelper.js';
 import { logger } from '../../../utils/logger.js';
 import {
-    getPendingVerification,
-    fetchRobloxProfile,
+    getPendingLink,
     saveRobloxLink,
-    clearPendingVerification,
+    clearPendingLink,
 } from '../../../services/robloxVerificationService.js';
 import { getGuildConfig } from '../../../services/config/guildConfig.js';
 
@@ -18,23 +17,15 @@ export default {
         if (!deferred) return;
 
         try {
-            const pending = await getPendingVerification(interaction.user.id);
+            const pending = await getPendingLink(interaction.user.id);
 
             if (!pending) {
                 await replyUserError(interaction, { type: ErrorTypes.VALIDATION, message: 'Your verification session expired or was not found. Click the **Verify** button again to restart.' });
                 return;
             }
 
-            const profile = await fetchRobloxProfile(pending.robloxId);
-            const bio = profile?.description || '';
-
-            if (!bio.includes(pending.code)) {
-                await replyUserError(interaction, { type: ErrorTypes.VALIDATION, message: `I couldn't find the code **${pending.code}** in your Roblox "About" section yet. Make sure you saved your profile, then click the button again.` });
-                return;
-            }
-
             await saveRobloxLink(interaction.user.id, { robloxId: pending.robloxId, robloxUsername: pending.robloxUsername });
-            await clearPendingVerification(interaction.user.id);
+            await clearPendingLink(interaction.user.id);
 
             const notes = [];
 
@@ -60,7 +51,7 @@ export default {
             }
 
             await InteractionHelper.safeEditReply(interaction, {
-                embeds: [successEmbed('✅ Roblox Account Verified', `Linked to **${pending.robloxUsername}**.\n\n${notes.join('\n')}`)],
+                embeds: [successEmbed('✅ Verified', `Linked to **${pending.robloxUsername}**.\n\n${notes.join('\n')}`)],
             });
         } catch (error) {
             await handleInteractionError(interaction, error, { commandName: 'roblox_verify_confirm', source: 'roblox_verify_confirm' });
