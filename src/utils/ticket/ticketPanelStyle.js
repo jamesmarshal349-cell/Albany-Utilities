@@ -27,13 +27,19 @@ export function buildTicketPanelContainer(config, assistanceRow = null) {
             new MediaGalleryBuilder().addItems(
                 new MediaGalleryItemBuilder().setURL(TICKET_PANEL_BANNER_URL),
             ),
-        )
-        .addSeparatorComponents(new SeparatorBuilder())
-        .addTextDisplayComponents(
-            new TextDisplayBuilder().setContent(
-                config?.ticketPanelMessage || 'Select a category below to get started.',
-            ),
         );
+
+    const message = config?.ticketPanelMessage || 'Select a category below to get started.';
+    // Blank lines mark separate sections (e.g. the intro paragraph vs. each "## Topic"
+    // block) — a separator goes before each one so every section is divided, not just
+    // the text as a whole.
+    const sections = message.split(/\n{2,}/).map((section) => section.trim()).filter(Boolean);
+
+    for (const section of sections.length > 0 ? sections : [message]) {
+        container
+            .addSeparatorComponents(new SeparatorBuilder())
+            .addTextDisplayComponents(new TextDisplayBuilder().setContent(section));
+    }
 
     if (assistanceRow) {
         container
