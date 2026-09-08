@@ -6,8 +6,6 @@ import {
     ContainerBuilder,
     MediaGalleryBuilder,
     MediaGalleryItemBuilder,
-    TextDisplayBuilder,
-    SeparatorBuilder,
 } from 'discord.js';
 import { getColor } from '../../config/bot.js';
 import { TICKET_PANEL_COLOR } from '../../utils/ticket/ticketPanelStyle.js';
@@ -15,10 +13,6 @@ import { InteractionHelper } from '../../utils/interactionHelper.js';
 import { successEmbed } from '../../utils/embeds.js';
 import { replyUserError, ErrorTypes, handleInteractionError } from '../../utils/errorHandler.js';
 import { logger } from '../../utils/logger.js';
-
-// <:name:id> works for rendering regardless of the exact name text, as long as the ID
-// is a real emoji Discord (or this bot's servers) can resolve.
-const SHOWCASE_EMOJI = '<:emoji:1546691402380091482>';
 
 export default {
     data: new SlashCommandBuilder()
@@ -67,10 +61,6 @@ export default {
 
             const container = new ContainerBuilder()
                 .setAccentColor(getColor(TICKET_PANEL_COLOR))
-                .addTextDisplayComponents(
-                    new TextDisplayBuilder().setContent(`-# ${SHOWCASE_EMOJI} ${interaction.user}`),
-                )
-                .addSeparatorComponents(new SeparatorBuilder())
                 .addMediaGalleryComponents(
                     new MediaGalleryBuilder().addItems(
                         new MediaGalleryItemBuilder().setURL(`attachment://${fileName}`),
