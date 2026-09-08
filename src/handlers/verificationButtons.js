@@ -1,61 +1,46 @@
-import { MessageFlags } from 'discord.js';
-import { successEmbed } from '../utils/embeds.js';
-import { verifyUser } from '../services/verificationService.js';
-import { handleInteractionError, replyUserError, ErrorTypes } from '../utils/errorHandler.js';
+import { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder } from 'discord.js';
+import { replyUserError, ErrorTypes } from '../utils/errorHandler.js';
 import { logger } from '../utils/logger.js';
-import { InteractionHelper } from '../utils/interactionHelper.js';
+import { getRobloxLink } from '../services/robloxVerificationService.js';
 
 export async function handleVerificationButton(interaction, client) {
     try {
-        await InteractionHelper.safeDefer(interaction, { flags: MessageFlags.Ephemeral });
-
         if (!interaction.guild) {
-            return await replyUserError(interaction, { type: ErrorTypes.UNKNOWN, message: 'This button can only be used in a server.' });
+            await replyUserError(interaction, { type: ErrorTypes.UNKNOWN, message: 'This button can only be used in a server.' });
+            return;
         }
 
-        const guild = interaction.guild;
-        const userId = interaction.user.id;
-
-        logger.debug('User clicked verify button', {
-            guildId: guild.id,
-            userId,
-            userTag: interaction.user.tag
-        });
-
-        const result = await verifyUser(client, guild.id, userId, {
-            source: 'button_click',
-            moderatorId: null
-        });
-
-        if (result.status === 'already_verified') {
-            return await replyUserError(interaction, { type: ErrorTypes.VALIDATION, message: 'You are already verified and have access to all server channels.' });
+        const existing = await getRobloxLink(interaction.user.id);
+        if (existing) {
+            await replyUserError(interaction, { type: ErrorTypes.VALIDATION, message: `You're already linked to Roblox account **${existing.robloxUsername}**. Ask a staff member to unlink you first if you need to re-verify.` });
+            return;
         }
 
-        logger.info('User verified via button', {
-            guildId: guild.id,
-            userId,
-            roleName: result.roleName
-        });
+        const modal = new ModalBuilder()
+            .setCustomId('roblox_verify_modal')
+            .setTitle('Roblox Verification');
 
-        await InteractionHelper.safeEditReply(interaction, {
-            embeds: [successEmbed(
-                "✅ Verification Successful!",
-                `You have been verified and given the **${result.roleName}** role!\n\nYou now have access to all server channels and features. Welcome! 🎉`
-            )],
-        });
+        const usernameInput = new TextInputBuilder()
+            .setCustomId('roblox_username')
+            .setLabel('Your Roblox Username')
+            .setStyle(TextInputStyle.Short)
+            .setPlaceholder('e.g. Builderman')
+            .setRequired(true)
+            .setMaxLength(50);
 
+        modal.addComponents(new ActionRowBuilder().addComponents(usernameInput));
+
+        await interaction.showModal(modal);
+
+        logger.debug('User opened Roblox verification modal', {
+            guildId: interaction.guild.id,
+            userId: interaction.user.id,
+        });
     } catch (error) {
-        logger.error('Error in verification button handler', {
-            error: error.message,
-            guildId: interaction.guild?.id,
-            userId: interaction.user.id
-        });
-
-        await handleInteractionError(
-            interaction,
-            error,
-            { command: 'verify_button', action: 'verification' }
-        );
+        logger.error('Error opening Roblox verification modal:', error);
+        if (!interaction.replied && !interaction.deferred) {
+            await replyUserError(interaction, { type: ErrorTypes.UNKNOWN, message: 'Could not open the verification form.' }).catch(() => {});
+        }
     }
 }
 
