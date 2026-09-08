@@ -112,6 +112,16 @@ export function getReactionRolesPrefix(guildId) {
     return `guild:${guildId}:reaction_roles:`;
 }
 
+// Roblox account links are per-Discord-user, not per-guild — a person's Roblox
+// identity doesn't change based on which server they're verifying in.
+export function getRobloxLinkKey(userId) {
+    return `roblox:link:${userId}`;
+}
+
+export function getRobloxPendingKey(userId) {
+    return `roblox:pending:${userId}`;
+}
+
 export function getServerCountersKey(guildId) {
     return `guild:${guildId}:counters`;
 }
