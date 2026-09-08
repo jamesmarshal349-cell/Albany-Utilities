@@ -121,14 +121,6 @@ export async function getTicketPanelStatus(client, guild, config) {
     });
 }
 
-export async function getVerificationPanelStatus(client, guild, config) {
-    return getBotPanelStatus(client, guild, {
-        channelId: config?.channelId,
-        messageId: config?.messageId,
-        buttonCustomId: 'verify_user',
-    });
-}
-
 export async function getReactionRolePanelStatus(client, guild, panelData) {
     return getBotPanelStatus(client, guild, {
         channelId: panelData?.channelId,

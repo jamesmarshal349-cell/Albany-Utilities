@@ -6,14 +6,6 @@ import cron from 'node-cron';
 
 import config from './config/application.js';
 import { initializeDatabase } from './utils/database.js';
-import { getGuildConfig } from './services/config/guildConfig.js';
-import {
-  consumeOAuthState,
-  exchangeCodeForToken,
-  fetchOAuthUserInfo,
-  saveRobloxLink,
-} from './services/robloxVerificationService.js';
-import { renderAuthResultPage, escapeHtml } from './utils/verification/authResultPage.js';
 import { getServerCounters, saveServerCounters, updateCounter } from './services/serverstatsService.js';
 import { logger, startupLog, shutdownLog } from './utils/logger.js';
 import { checkBirthdays } from './services/birthdayService.js';
@@ -215,80 +207,6 @@ class TitanBot extends Client {
         version: pkg.version,
         timestamp: new Date().toISOString()
       });
-    });
-
-    app.get('/auth/roblox/callback', async (req, res) => {
-      const { code, state, error: oauthError } = req.query;
-
-      if (oauthError) {
-        return res.status(400).send(renderAuthResultPage({
-          title: 'Verification Cancelled',
-          message: 'You didn\'t finish signing in with Roblox. You can close this tab and click Verify again in Discord.',
-          isError: true,
-        }));
-      }
-
-      if (!code || !state) {
-        return res.status(400).send(renderAuthResultPage({
-          title: 'Invalid Request',
-          message: 'This verification link is missing required information.',
-          isError: true,
-        }));
-      }
-
-      try {
-        const pending = await consumeOAuthState(state);
-        if (!pending) {
-          return res.status(400).send(renderAuthResultPage({
-            title: 'Link Expired',
-            message: 'This verification link expired or was already used. Please click Verify again in Discord.',
-            isError: true,
-          }));
-        }
-
-        const tokenData = await exchangeCodeForToken(code);
-        const userInfo = await fetchOAuthUserInfo(tokenData.access_token);
-
-        await saveRobloxLink(pending.discordUserId, {
-          robloxId: userInfo.sub,
-          robloxUsername: userInfo.preferred_username,
-        });
-
-        try {
-          const guild = await this.guilds.fetch(pending.guildId);
-          const member = await guild.members.fetch(pending.discordUserId);
-          const guildConfig = await getGuildConfig(this, pending.guildId);
-
-          try {
-            await member.setNickname(String(userInfo.preferred_username).slice(0, 32));
-          } catch (nickError) {
-            logger.warn('Could not set nickname after Roblox OAuth:', nickError.message);
-          }
-
-          const roleId = guildConfig.verification?.roleId || guildConfig.robloxVerifiedRoleId;
-          if (roleId) {
-            try {
-              await member.roles.add(roleId);
-            } catch (roleError) {
-              logger.warn('Could not grant role after Roblox OAuth:', roleError.message);
-            }
-          }
-        } catch (guildError) {
-          logger.warn('Could not apply Discord updates after Roblox OAuth:', guildError.message);
-        }
-
-        res.status(200).send(renderAuthResultPage({
-          title: '✅ Verified!',
-          message: `You're linked to Roblox account <strong>${escapeHtml(userInfo.preferred_username)}</strong>. You can close this tab and return to Discord.`,
-        }));
-      } catch (error) {
-        logger.error('Roblox OAuth callback error:', error);
-        res.status(500).send(renderAuthResultPage({
-          title: 'Something Went Wrong',
-          message: 'Please try verifying again from Discord.',
-          isError: true,
-        }));
-      }
     });
 
     const startServer = (port, attempt = 0) => {

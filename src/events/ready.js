@@ -2,7 +2,7 @@ import { Events } from "discord.js";
 import { logger, startupLog } from "../utils/logger.js";
 import config from "../config/application.js";
 import { reconcileReactionRoleMessages } from "../services/reactionRoleService.js";
-import { reconcileTicketPanels, reconcileVerificationPanels, reconcileReactionRolePanelHealth } from "../services/panelHealthService.js";
+import { reconcileTicketPanels, reconcileReactionRolePanelHealth } from "../services/panelHealthService.js";
 import { initRiffyAfterReady } from "../services/music/riffySetup.js";
 
 export default {
@@ -29,11 +29,6 @@ export default {
       const ticketPanelSummary = await reconcileTicketPanels(client);
       startupLog(
         `Ticket panel health: scanned ${ticketPanelSummary.scannedGuilds} guilds, healthy ${ticketPanelSummary.healthyPanels}, deleted ${ticketPanelSummary.deletedPanels}, missing channel ${ticketPanelSummary.missingChannels}, recovered ${ticketPanelSummary.recoveredIds}, errors ${ticketPanelSummary.errors}`
-      );
-
-      const verificationPanelSummary = await reconcileVerificationPanels(client);
-      startupLog(
-        `Verification panel health: scanned ${verificationPanelSummary.scannedGuilds} guilds, healthy ${verificationPanelSummary.healthyPanels}, deleted ${verificationPanelSummary.deletedPanels}, missing channel ${verificationPanelSummary.missingChannels}, recovered ${verificationPanelSummary.recoveredIds}, errors ${verificationPanelSummary.errors}`
       );
 
       const reactionRolePanelSummary = await reconcileReactionRolePanelHealth(client);
