@@ -174,6 +174,14 @@ export class ModerationService {
 
       if (targetMember) {
         this.assertModerationHierarchy(moderator, targetMember, 'ban');
+
+        if (targetMember.permissions.has(PermissionFlagsBits.Administrator)) {
+          throw new TitanBotError(
+            'Cannot ban an Administrator',
+            ErrorTypes.PERMISSION,
+            `I cannot ban **${getTargetLabel(targetMember)}** — members with the **Administrator** permission are protected from moderation actions, regardless of role hierarchy.`
+          );
+        }
       } else {
 
         const isOwner = guild.ownerId === moderator.id;
